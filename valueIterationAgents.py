@@ -64,39 +64,39 @@ class ValueIterationAgent(ValueEstimationAgent):
     def runValueIteration(self):
         # Write value iteration code here
         "*** YOUR CODE HERE ***"
-        print('===================== in runValueIteration===================')
+        # print('===================== in runValueIteration===================')
         current_iteration = 1
         states = self.mdp.getStates()
         values_dict = util.Counter()
         # initialize all values to 0
         for state in states:
             values_dict[str(state)+'0'] = 0
-        print(values_dict)
+        # print(values_dict)
         # run value iteration
         while current_iteration <= self.iterations:
-            print('===================== iteration number ', current_iteration ,'===================')
+            # print('===================== iteration number ', current_iteration ,'===================')
             for state in states:
-                print('state is',state)
+                # print('state is',state)
                 if state == 'TERMINAL_STATE': continue
                 temp_values = util.Counter()
-                print ('possible actions are', self.mdp.getPossibleActions(state))
+                # print ('possible actions are', self.mdp.getPossibleActions(state))
                 for action in self.mdp.getPossibleActions(state):
-                    print('action is',action)
+                    # print('action is',action)
                     temp_state_value = 0
                     for nextState,prob in self.mdp.getTransitionStatesAndProbs(state,action):
-                        print('next state is', nextState, 'and prob is', prob)
-                        print('values_dict is ',str(state)+str(current_iteration-1),
-                              'and values inside is', values_dict[str(state)+str(current_iteration-1)])
-                        print('reward function is', self.mdp.getReward(state, action,nextState))
+                        # print('next state is', nextState, 'and prob is', prob)
+                        # print('values_dict is ',str(state)+str(current_iteration-1),
+                        #       'and values inside is', values_dict[str(state)+str(current_iteration-1)])
+                        # print('reward function is', self.mdp.getReward(state, action,nextState))
                         if self.mdp.isTerminal(nextState):
                             temp_state_value += prob * (self.mdp.getReward(state, action, nextState))
                         else:
                             temp_state_value+= prob*(self.mdp.getReward(state, action,nextState)
                                                + self.discount*values_dict[str(nextState)+str(current_iteration-1)])
-                        print('temp_state_value is',temp_state_value)
+                        # print('temp_state_value is',temp_state_value)
 
                     temp_values[action] = temp_state_value
-                print('dictionary is ', temp_values)
+                # print('dictionary is ', temp_values)
                 # if no action, return value to be 0
                 max_action = max(temp_values, default = None, key=temp_values.get)
                 max_value = temp_values[max_action]
@@ -119,11 +119,11 @@ class ValueIterationAgent(ValueEstimationAgent):
           value function stored in self.values.
         """
         "*** YOUR CODE HERE ***"
-        print('===================== in computeQValueFromValues ===================')
-        print('state and action are', state,action)
+        # print('===================== in computeQValueFromValues ===================')
+        # print('state and action are', state,action)
         qValue = 0
         for nextState, nextProb in self.mdp.getTransitionStatesAndProbs(state,action):
-            print('next state and prob is',nextState,nextProb)
+            # print('next state and prob is',nextState,nextProb)
             qValue += nextProb*(self.mdp.getReward(state,action,nextState) + self.discount * self.values[nextState])
         return qValue
 
@@ -184,9 +184,39 @@ class AsynchronousValueIterationAgent(ValueIterationAgent):
               mdp.isTerminal(state)
         """
         ValueIterationAgent.__init__(self, mdp, discount, iterations)
+        self.runValueIteration()
 
     def runValueIteration(self):
-        "*** YOUR CODE HERE ***"
+        current_iteration = 0
+        states = self.mdp.getStates()
+        # run value iteration
+        print(self.iterations)
+        while current_iteration < self.iterations:
+            temp_values = self.values.copy()
+            state = states[current_iteration%len(states)]
+            if state == 'TERMINAL_STATE': continue
+            # print ('possible actions are', self.mdp.getPossibleActions(state))
+            next_state_dict = {}
+            for action in self.mdp.getPossibleActions(state):
+                # print('action is',action)
+                temp_state_value = 0
+                for next_state,prob in self.mdp.getTransitionStatesAndProbs(state,action):
+                    # print('next state is', nextState, 'and prob is', prob)
+                    # print('values_dict is ',str(state)+str(current_iteration-1),
+                    #       'and values inside is', values_dict[str(state)+str(current_iteration-1)])
+                    # print('reward function is', self.mdp.getReward(state, action,nextState))
+                    if self.mdp.isTerminal(next_state):
+                        temp_state_value += prob * (self.mdp.getReward(state, action, next_state))
+                    else:
+                        temp_state_value += prob*(self.mdp.getReward(state, action,next_state)
+                                           + self.discount*temp_values[next_state])
+                    # print('temp_state_value is',temp_state_value)
+                next_state_dict[action] = temp_state_value
+            # if no action, return value to be 0
+            max_value = max(next_state_dict.values())
+            self.values[state] = max_value
+            current_iteration +=1
+
 
 class PrioritizedSweepingValueIterationAgent(AsynchronousValueIterationAgent):
     """
