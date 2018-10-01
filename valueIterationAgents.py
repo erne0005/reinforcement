@@ -184,27 +184,29 @@ class AsynchronousValueIterationAgent(ValueIterationAgent):
               mdp.isTerminal(state)
         """
         ValueIterationAgent.__init__(self, mdp, discount, iterations)
-        self.runValueIteration()
+
 
     def runValueIteration(self):
         current_iteration = 0
         states = self.mdp.getStates()
         # run value iteration
-        print(self.iterations)
+        # print('===================== iteration is ', self.iterations, '===================')
         while current_iteration < self.iterations:
+            # print('===================== iteration number ', current_iteration ,'===================')
             temp_values = self.values.copy()
             state = states[current_iteration%len(states)]
-            if state == 'TERMINAL_STATE': continue
+            # print('state is ', state)
+            current_iteration += 1
+            # if state == 'TERMINAL_STATE': continue
+            if self.mdp.isTerminal(state): continue
             # print ('possible actions are', self.mdp.getPossibleActions(state))
-            next_state_dict = {}
+            next_state_dict = util.Counter()
             for action in self.mdp.getPossibleActions(state):
                 # print('action is',action)
                 temp_state_value = 0
                 for next_state,prob in self.mdp.getTransitionStatesAndProbs(state,action):
-                    # print('next state is', nextState, 'and prob is', prob)
-                    # print('values_dict is ',str(state)+str(current_iteration-1),
-                    #       'and values inside is', values_dict[str(state)+str(current_iteration-1)])
-                    # print('reward function is', self.mdp.getReward(state, action,nextState))
+                    # print('next state is', next_state, 'and prob is', prob)
+                    # print('reward function is', self.mdp.getReward(state, action,next_state))
                     if self.mdp.isTerminal(next_state):
                         temp_state_value += prob * (self.mdp.getReward(state, action, next_state))
                     else:
@@ -213,9 +215,13 @@ class AsynchronousValueIterationAgent(ValueIterationAgent):
                     # print('temp_state_value is',temp_state_value)
                 next_state_dict[action] = temp_state_value
             # if no action, return value to be 0
-            max_value = max(next_state_dict.values())
-            self.values[state] = max_value
-            current_iteration +=1
+            # print('dictionary of states is ',next_state_dict)
+            if len(self.mdp.getPossibleActions(state))==0:
+                self.values[state] = 0
+            else:
+                max_value = max(next_state_dict.values())
+                self.values[state] = max_value
+
 
 
 class PrioritizedSweepingValueIterationAgent(AsynchronousValueIterationAgent):
@@ -237,4 +243,73 @@ class PrioritizedSweepingValueIterationAgent(AsynchronousValueIterationAgent):
 
     def runValueIteration(self):
         "*** YOUR CODE HERE ***"
+        states = self.mdp.getStates()
+        # get predecessors
+        predecessors = util.Counter()
+        for state in states:
+            for action in self.mdp.getPossibleActions(state):
+                for next_state, next_prob in self.mdp.getTransitionStatesAndProbs(state,action):
+                    if next_prob > 0:
+                        if predecessors[next_state] == 0:
+                            predecessors[next_state] = set()
+                            predecessors[next_state].add(state)
+                        else:
+                            predecessors[next_state].add(state)
+        # initialize empty priority queue
+        print('predecessors are',predecessors)
+        priority_q = util.PriorityQueue()
+        diff_dict = {}
+        # initialize priority queue
+        for state in states:
+            if self.mdp.isTerminal(state): continue
+            next_state_dict = util.Counter()
+            for action in self.mdp.getPossibleActions(state):
+                # print('action is',action)
+                temp_state_value = 0
+                for next_state, prob in self.mdp.getTransitionStatesAndProbs(state, action):
+                    # print('next state is', next_state, 'and prob is', prob)
+                    # print('reward function is', self.mdp.getReward(state, action,next_state))
+                    if self.mdp.isTerminal(next_state):
+                        temp_state_value += prob * (self.mdp.getReward(state, action, next_state))
+                    else:
+                        temp_state_value += prob * (self.mdp.getReward(state, action, next_state)
+                                                    + self.discount * self.values[next_state])
+                    # print('temp_state_value is',temp_state_value)
+                next_state_dict[action] = temp_state_value
+            print('q values for state is',next_state_dict)
+            max_value = max(next_state_dict.values())
+            diff = (max_value - self.values[state])
+            diff_dict[state] = diff
+            print('diff is', diff)
+            priority_q.push(state,-abs(diff))
+            print('priority queue is',priority_q.heap)
+        # run iteration
+        for current_iteration in range(self.iterations):
+            print('===================== iteration number ', current_iteration ,'===================')
+            if priority_q.isEmpty(): break
+            min_state = priority_q.pop()
+            if not self.mdp.isTerminal(min_state):
+                self.values[min_state] += diff_dict[min_state]
+            # loop through predecessors
+            for pred in predecessors[min_state]:
+                next_state_dict = util.Counter()
+                # get the highest q value of p
+                for action in self.mdp.getPossibleActions(pred):
+                    # print('action is',action)
+                    temp_state_value = 0
+                    for next_state, prob in self.mdp.getTransitionStatesAndProbs(pred, action):
+                        # print('next state is', next_state, 'and prob is', prob)
+                        # print('reward function is', self.mdp.getReward(pred, action,next_state))
+                        if self.mdp.isTerminal(next_state):
+                            temp_state_value += prob * (self.mdp.getReward(pred, action, next_state))
+                        else:
+                            temp_state_value += prob * (self.mdp.getReward(pred, action, next_state)
+                                                        + self.discount * self.values[next_state])
+                        # print('temp_state_value is',temp_state_value)
+                    next_state_dict[action] = temp_state_value
 
+                pred_max_value = max(next_state_dict.values(), default=0)
+                diff = (pred_max_value - self.values[pred])
+                diff_dict[pred] = diff
+                if abs(diff) > self.theta:
+                    priority_q.update(pred,-abs(diff))
